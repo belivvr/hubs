@@ -9,7 +9,7 @@ import { MyCameraTool } from "../bit-components";
 import { anyEntityWith } from "../utils/bit-utils";
 
 import configs from "../utils/configs";
-import { isLockedDownDemoRoom } from "../utils/hub-utils";
+import { isLockedDownDemoRoom, isRoomOwner } from "../utils/hub-utils";
 import { VR_DEVICE_AVAILABILITY } from "../utils/vr-caps-detect";
 import { canShare } from "../utils/share";
 import styles from "../assets/stylesheets/ui-root.scss";
@@ -109,6 +109,9 @@ import ChatToolbarButton from "./room/components/ChatToolbarButton/ChatToolbarBu
 import SeePlansCTA from "./room/components/SeePlansCTA/SeePlansCTA";
 import { BackButton } from "./input/BackButton";
 import { IframeSidebar } from "./iframeSidebar/iframeSidebar";
+import { addEntity, addComponent, hasComponent } from "bitecs";
+import { changeHub } from "../change-hub";
+import { hubIdFromUrl } from "../utils/media-url-utils";
 
 const avatarEditorDebug = qsTruthy("avatarEditorDebug");
 
@@ -910,36 +913,59 @@ class UIRoot extends Component {
   };
 
   onInlineFrame = e => {
-    // [Belivvr Custom] InlineView is SPOKE's component name based InlineFrame.
-    // The component in Spoke uses the name 'inlineview' instead of the keyword 'inlineframe' to avoid confusion.
     const inlineViewName = e.detail.name;
     const { linkPayload } = this.state;
-    // Only set parameter if linkPayload exists, otherwise set to an empty string
     const parameter = linkPayload || "";
     const url = new URL(e.detail.url);
     url.searchParams.set('hubsParam', parameter);
     url.searchParams.set('inlineViewName', inlineViewName);
     
-    // setState 후 콜백에서 window.open 호출
     this.setState({ innerFrameURL: url.toString() }, () => {   
-        switch (e.detail.option) {
-          case "main":
-            this.setState({ mainInnerFrame: true });
-            return window.innerWidth > 992 && this.toggleSidebar("chat", { chatPrefix: "", chatAutofocus: false });
-          case "sideView":
-            if (this.state.sidebarId !== "side-iframe") {
-              this.toggleSidebar("side-iframe");
+      switch (e.detail.option) {
+        case "main":
+          this.setState({ mainInnerFrame: true });
+          return window.innerWidth > 992 && this.toggleSidebar("chat", { chatPrefix: "", chatAutofocus: false });
+          break;
+
+        case "sideView":
+          if (this.state.sidebarId === "side-iframe") {
+            this.setSidebar(null);
+          } else {
+            this.toggleSidebar("side-iframe");
+          }
+          break;
+
+        case "selfWindow":
+          try {
+            // URL 체크
+            const isRoomUrl = url.toString().includes("/hub.link/") || url.toString().includes("/room");
+            
+            if (!isRoomUrl) {
+              this.setState({ selfWindow: true });
+              return;
             }
-            break;
-          case "selfWindow":
-            this.setState({ selfWindow: true });
-            break;
-          case "newWindow":
-            // URL을 바로 전달하여 새 창에 로드되도록 수정
-            window.open(this.state.innerFrameURL, '_blank');
-            return;
-        }
-  });
+
+            // Room URL일 경우 changeHub 사용
+            const hubId = hubIdFromUrl(url.toString());
+            if (hubId) {
+              changeHub(hubId, true).catch(error => {
+                console.error("[InlineFrame] Hub change failed:", error);
+              });
+            }
+            
+          } catch (error) {
+            console.error("[InlineFrame] Error in selfWindow processing:", error);
+          }
+          break;
+
+        case "newWindow":
+          window.open(url.toString(), '_blank');
+          break;
+          
+        default:
+          break;
+      }
+    });
   }
   
 

@@ -3,7 +3,7 @@ set -ex
 cd "$(dirname "$0")"
 
 # Source the environment file if needed
-ENV_FILE="../.env.cnu"
+ENV_FILE="../.env"
 if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
 fi

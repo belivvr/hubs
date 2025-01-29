@@ -10,10 +10,13 @@ interface Props {
 
 export enum ACTION_TYPES {
     CLICK = 'click-event',
+    OPEN_INLINE_URL = 'open-inline-url',
 }
 
 export async function logToXRCLOUD({ type, eventTime, roomId, userId, eventAction }: Props) {
-    return fetch(`${(window as any).serverUrl}/events/hub`, {
+    const loggingUrl = (configs as any).LOGGING_URL || `${(window as any).serverUrl}/logs/`;
+    
+    return fetch(loggingUrl, {
         method: "POST",
         headers: {
         "content-type": "application/json",
