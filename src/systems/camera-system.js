@@ -23,20 +23,20 @@ function setObjectPositionFromMatrix(object, matrix) {
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3();
 
-  // 행렬에서 위치와 스케일을 추출
+  // Extract position and scale from the matrix
   matrix.decompose(position, new THREE.Quaternion(), scale);
 
   if (object.parent) {
-    // 부모 객체의 위치를 고려하여 상대 위치로 변환
+    // Convert to relative position considering the parent's position
     const parentPosition = new THREE.Vector3();
     object.parent.updateMatrixWorld();
     object.parent.matrixWorld.decompose(parentPosition, new THREE.Quaternion(), new THREE.Vector3());
     position.sub(parentPosition);
   }
 
-  position.y += 1.6; // 아바타 키 높이 만큼 위로 올리기
+  position.y += 1.6; // Raise by avatar height
   object.position.copy(position);
-  object.scale.copy(scale); // 스케일 반영
+  object.scale.copy(scale); // Apply scale
 }
 
 function getInspectableInHierarchy(eid) {
@@ -207,8 +207,8 @@ export const CAMERA_MODE_THIRD_PERSON_NEAR = 1;
 export const CAMERA_MODE_THIRD_PERSON_FAR = 2;
 export const CAMERA_MODE_INSPECT = 3;
 export const CAMERA_MODE_SCENE_PREVIEW = 4;
-export const CAMERA_MODE_THIRD_PERSON_VIEW = 5;
-const THIRD_PERSON_VIEW_DISTANCE = 2;   // 카메라 거리
+export const CAMERA_MODE_THIRD_PERSON_VIEW = 5; // [BELIVVR Custom, Third-Person View] Define a new camera mode for third-person view
+const THIRD_PERSON_VIEW_DISTANCE = 2; // [BELIVVR Custom, Third-Person View] Set the default distance for third-person view
 
 const NEXT_MODES = {
   [CAMERA_MODE_FIRST_PERSON]: CAMERA_MODE_THIRD_PERSON_NEAR,
@@ -453,39 +453,9 @@ export class CameraSystem {
     camera.layers.mask = this.snapshot.mask;
   }
 
- 
-  toggleThirdPersonView() {
-    const scene = AFRAME.scenes[0];
-    const cameraSystem = scene.systems["hubs-systems"].cameraSystem;
-    const avatarPOVNode = document.getElementById("avatar-pov-node");
-    const viewingCamera = document.getElementById("viewing-camera");
+  
 
-    if (cameraSystem.mode === CAMERA_MODE_FIRST_PERSON) {
-      // 1인칭 모드에서 3인칭 모드로 전환
-      cameraSystem.mode = CAMERA_MODE_THIRD_PERSON_VIEW;
-
-      // avatar-pov-node에서 pitch-yaw-rotator 제거
-      avatarPOVNode.removeAttribute("pitch-yaw-rotator");
-
-      // viewing-camera에 pitch-yaw-rotator 추가
-      viewingCamera.setAttribute("pitch-yaw-rotator", "");
-    } else if (cameraSystem.mode === CAMERA_MODE_THIRD_PERSON_VIEW) {
-      // 3인칭 모드에서 1���칭 모드로 전환
-      cameraSystem.mode = CAMERA_MODE_FIRST_PERSON;
-
-      // viewing-camera에서 pitch-yaw-rotator 제거
-      viewingCamera.removeAttribute("pitch-yaw-rotator");
-
-      // avatar-pov-node에 pitch-yaw-rotator 추가
-      avatarPOVNode.setAttribute("pitch-yaw-rotator", "");
-
-      // 3인칭 뷰 상태 초기화
-      cameraSystem.horizontalDelta = 0;
-      cameraSystem.verticalDelta = 0;
-    }
-  }
-
-  // 캐릭터가 움직이는지 여부를 살펴보는 메소드
+  // Method to check if the character is moving
   isMoving(){  
     const vector = this.userinput.get(paths.actions.characterAcceleration);
     //  방향키 이동
@@ -510,6 +480,7 @@ export class CameraSystem {
     let uiRoot;
     const hoveredQuery = defineQuery([HoveredRemoteRight]);
     return function tick(scene, dt) {
+    
       this.viewingCamera.matrixNeedsUpdate = true;
       this.viewingCamera.updateMatrix();
       this.viewingCamera.updateMatrixWorld();
@@ -577,24 +548,24 @@ export class CameraSystem {
         this.viewingCameraRotator.on = false;
         if (!scene.is("vr-mode")) {
           /**
-           * belivvr custom
-           * 1인칭 시에 내 머리 속이 보이는 걸 해결하기 위해 위치 조정
-           * 달리기면 카메라를 더 앞으로 내민다.
+           * [BELIVVR Custom]
+           * Adjust position to prevent seeing inside the head in first-person mode.
+           * Move the camera further forward if running.
            */
           const userinput = scene.systems.userinput;
       
-          // characterAcceleration이 정의되지 않은 경우 카메라 이동 처리 하지 않음
+          // Skip camera movement if characterAcceleration is undefined
           const vector = userinput.get(paths.actions.characterAcceleration);
           const boost = userinput.get(paths.actions.boost) || false;
       
-          // vector가 정상적으로 의된 경우에만 처리
+          // Process only if vector is valid
           if (vector && Array.isArray(vector) && vector.length >= 2) {
               const [right, front] = vector;
       
-              // 달리기 상태인지 확인
+              // Check if running
               const isRunning = boost || 1 < Math.abs(right) || 1 < Math.abs(front);
       
-              // isRunning에 따라 카메라 이동
+              // Move camera based on isRunning
               tmpMat.makeTranslation(0, 0, isRunning ? -1 : -0.4);
           } else {
               console.warn("Vector is undefined or invalid. Camera movement skipped.");
@@ -677,7 +648,7 @@ export class CameraSystem {
           );
         }
       } else if (this.mode === CAMERA_MODE_THIRD_PERSON_VIEW) {        
-        
+        // [BELIVVR Custom, Third-Person View] Handle camera updates for third-person view mode
         const avatarPOVNode = document.getElementById("avatar-pov-node");
         const viewingCamera = document.getElementById("viewing-camera");
         
@@ -691,41 +662,49 @@ export class CameraSystem {
           this.viewingCameraRotator.on = false;                
           tmpMat.makeTranslation(0, 0, THIRD_PERSON_VIEW_DISTANCE);
 
-            // 아바타의 위치를 기준으로 카메라 위치 설정
+            // [BELIVVR Custom, Third-Person View] Set camera position relative to avatar
             const offset = new THREE.Vector3(
               THIRD_PERSON_VIEW_DISTANCE * Math.sin(0) * Math.cos(0),
               THIRD_PERSON_VIEW_DISTANCE * Math.sin(0),
               THIRD_PERSON_VIEW_DISTANCE * Math.cos(0) * Math.cos(0)
             );
             const offsetMatrix = new THREE.Matrix4().makeTranslation(offset.x, offset.y, offset.z);
-
          
           setMatrixWorld(this.viewingRig.object3D, this.avatarRig.object3D.matrixWorld);                           
           setMatrixWorld(this.viewingCamera, this.avatarPOV.object3D.matrixWorld.clone().multiply(offsetMatrix));
-          
-      
-        } else  {           
+        } else {
+          // [BELIVVR Custom, Third-Person View] Adjust camera when the avatar is not moving
           avatarPOVNode.removeAttribute("pitch-yaw-rotator");
           viewingCamera.setAttribute("pitch-yaw-rotator", "");        
 
-          // 카메라의 회전을 아바타의 회전과 독립적으로 유지
+          if (this.firstFreeviewInThirdPersonView) {
+            // [BELIVVR Custom, Third-Person View] Align camera's axis to world coordinates
+            const cameraQuaternion = new THREE.Quaternion();
+            this.viewingCamera.getWorldQuaternion(cameraQuaternion);
+            const euler = new THREE.Euler().setFromQuaternion(cameraQuaternion, 'YXZ');            
+            cameraQuaternion.setFromEuler(euler);
+            this.viewingCamera.setRotationFromQuaternion(cameraQuaternion);
+  
+            this.firstFreeviewInThirdPersonView = false;
+          }
+          
+          // [BELIVVR Custom, Third-Person View] Maintain camera's rotation in world coordinates
           const cameraQuaternion = new THREE.Quaternion();
           viewingCamera.object3D.getWorldQuaternion(cameraQuaternion);
 
-          // 카메라의 회전을 아바타의 회전과 독립적으로 유지
+          // Apply rotation in world coordinates
           const euler = new THREE.Euler().setFromQuaternion(cameraQuaternion, 'YXZ');
-          // euler.z = 0; // roll 제거 부분을 주석 처리하거나 제거
+          euler.y = 0; // Remove roll rotation to prevent tilting
+          euler.z = 0;
           cameraQuaternion.setFromEuler(euler);
 
-          // 카메라의 회전을 아바타의 회전과 독립적으로 설정
-          const independentQuaternion = new THREE.Quaternion();
-          independentQuaternion.copy(cameraQuaternion);
-
-          viewingCamera.object3D.quaternion.copy(independentQuaternion);
+          // Apply camera rotation in world coordinates
+          viewingCamera.object3D.setRotationFromEuler(euler);
         }
-      
-      }      
+
+      }            
     }
+
 
 
   })();

@@ -52,8 +52,7 @@ export class CharacterControllerSystem {
   constructor(scene) {
     this.scene = scene;
 
-    this.fly = false;                    // 플라이 모드 여부
-    this.shouldLandWhenPossible = false; // 플라이 해제할지 여부
+    this.fly = false;                    // 플라이 모드 여부    
     this.waypoints = [];                 // 웨이포인트 이동 대기열
     this.waypointTravelStartTime = 0;
     this.waypointTravelTime = 0;
@@ -73,6 +72,7 @@ export class CharacterControllerSystem {
      */
     this.isJumping = false;
     this.isJumpDown  = false;
+    this.initialAvatarHeightforJump=0;
     /**
      * 점프 속도 벡터
      * @type {THREE.Vector3}
@@ -169,7 +169,6 @@ export class CharacterControllerSystem {
       // 스냅ToNavMesh가 false인데 fly=false면, fly를 강제로 켜기
       if (!this.fly && !snapToNavMesh) {
         this.fly = true;
-        this.shouldLandWhenPossible = true;
       }
       this.shouldUnoccupyWaypointsOnceMoving = true;
       this.didTeleportSinceLastWaypointTravel = false;
@@ -219,12 +218,13 @@ export class CharacterControllerSystem {
     const interpolatedWaypoint = new THREE.Matrix4();
     const startTranslation = new THREE.Matrix4();
     const waypointPosition = new THREE.Vector3();
-    const v = new THREE.Vector3();
+    const v = new THREE.Vector3();    
 
     let uiRoot;
 
     return function tick(t, dt) {
-      const entered = this.scene.is("entered");
+      const entered = this.scene.is("entered");      
+
       uiRoot = uiRoot || document.getElementById("ui-root");
       const isGhost = !entered && uiRoot && uiRoot.firstChild && uiRoot.firstChild.classList.contains("isGhost");
       if (!isGhost && !entered) return; // 진입 전이면 skip
@@ -294,14 +294,10 @@ export class CharacterControllerSystem {
       // 2) 플라이/점프/이동 처리
       const userinput = AFRAME.scenes[0].systems.userinput;
       const wasFlying = this.fly;
-      if (userinput.get(paths.actions.toggleFly)) {
-        this.shouldLandWhenPossible = false;
+      if (userinput.get(paths.actions.toggleFly)) {        
         this.avatarRig.messageDispatch.dispatch("/fly"); // fly 토글
       }
       const didStopFlying = wasFlying && !this.fly;
-      if (!this.fly && this.shouldLandWhenPossible) {
-        this.shouldLandWhenPossible = false;
-      }
       if (this.fly) {
         // 플라이면 내비 노드 무시
         this.navNode = null;
@@ -325,8 +321,11 @@ export class CharacterControllerSystem {
         // 점프 시작
         this.isJumping = true;
         this.isJumpDown = false;
-
-        this.shouldLandWhenPossible = true;
+        
+      // 아바타의 초기 키 저장
+        this.initialAvatarHeightforJump = this.avatarPOV.object3D.position.y;
+        console.log("[JUMP] initialAvatarHeightforJump: ", this.initialAvatarHeightforJump);
+        
         this.jumpVelocity.set(0, 6, 0); // 초속 6m 위로        
 
         console.log("[JUMP] Start: ", this.jumpVelocity);
@@ -338,20 +337,28 @@ export class CharacterControllerSystem {
         // 이번 프레임 이동량 = jumpVelocity * dt
         const jumpDelta = this.jumpVelocity.clone().multiplyScalar(dt / 1000);
         // avatarRig에 반영, displacementToDesiredPOV에도 반영, 착지는 아래의 코드에서 처리
+        console.log("[JUMP] this.isJumping velocity: ",this.jumpVelocity);     
+        console.log("[JUMP] avatarPOV.object3D.position.y: ",this.avatarPOV.object3D.position.y);     
+        console.log("[JUMP] jumpDelta :", jumpDelta);
+
         this.avatarRig.object3D.position.add(jumpDelta);
         this.avatarPOV.object3D.position.add(jumpDelta);
-
+        console.log("[JUMP] avatarPOV.object3D.position.y: ",this.avatarPOV.object3D.position.y);     
         // 하강 기록
         if (this.jumpVelocity.y < 0){
             this.isJumpDown = true;
             
-            if (this.avatarPOV.object3D.position.y < 1.8){ // 점프 중지
+            // 아바타의 초기 키 * 110%가 되는 시점에 점프 중지
+            if (this.avatarPOV.object3D.position.y < this.initialAvatarHeightforJump * 1.02){ 
+              console.log("[JUMP] Jump Stop: ",this.jumpVelocity);   
               this.isJumping = false;
               this.isJumpDown = false;
-              this.avatarRig.object3D.position.y = this.avatarRig.object3D.position.y - (this.avatarPOV.object3D.position.y - 1.6);
-              this.avatarPOV.object3D.position.y = 1.6;              
+              this.avatarRig.object3D.position.y = this.avatarRig.object3D.position.y - (this.avatarPOV.object3D.position.y - this.initialAvatarHeightforJump);
+              this.avatarPOV.object3D.position.y = this.initialAvatarHeightforJump;              
             }
-        }        
+        }   
+        
+
       }
 
       // 2-2) 이동 입력
@@ -407,7 +414,7 @@ export class CharacterControllerSystem {
             .multiply(snapRotatedPOV);
         }
 
-        const shouldRecomputeNavGroupAndNavNode = didStopFlying || this.shouldLandWhenPossible;
+        const shouldRecomputeNavGroupAndNavNode = didStopFlying;
         const shouldResnapToNavMesh = navMeshExists && (shouldRecomputeNavGroupAndNavNode || triedToMove);
 
         let squareDistNavMeshCorrection = 0;
@@ -422,11 +429,8 @@ export class CharacterControllerSystem {
 
           squareDistNavMeshCorrection = desiredPOVPosition.distanceToSquared(navMeshSnappedPOVPosition);
 
-          if (this.fly && this.shouldLandWhenPossible && squareDistNavMeshCorrection < 0.5 && !this.activeWaypoint) {
-            this.shouldLandWhenPossible = false;
-            this.fly = false;
-            this.isJumping = false;
-            this.isJumpDown = false;
+          if (this.fly && squareDistNavMeshCorrection < 0.5 && !this.activeWaypoint) {                      
+            this.fly = false;            
             newPOV.setPosition(navMeshSnappedPOVPosition);
           } else if (!this.fly) {
             newPOV.setPosition(navMeshSnappedPOVPosition);
@@ -446,13 +450,13 @@ export class CharacterControllerSystem {
           } else {
             this.waypointSystem.releaseAnyOccupiedWaypoints();
           }
-          if (this.fly && this.shouldLandWhenPossible && shouldResnapToNavMesh && squareDistNavMeshCorrection < 3) {
+          if (this.fly && shouldResnapToNavMesh && squareDistNavMeshCorrection < 3) {
             newPOV.setPosition(navMeshSnappedPOVPosition);
-            this.shouldLandWhenPossible = false;
             this.fly = false;
           }
         }
       }
+      
 
       // 최종: avatarRig.object3D ↔ avatarPOV.object3D 동기화
       childMatch(this.avatarRig.object3D, this.avatarPOV.object3D, newPOV);
@@ -460,6 +464,7 @@ export class CharacterControllerSystem {
       // 이동 후 relativeMotion 초기화/회전각 초기화
       this.relativeMotion.copy(this.nextRelativeMotion);
       this.dXZ = 0;
+      
     };
   })();
 

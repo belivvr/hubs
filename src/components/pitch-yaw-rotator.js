@@ -45,6 +45,11 @@ const rotatePitchAndYaw = (function () {
 let uiRoot;
 let scenePreviewNode;
 AFRAME.registerComponent("pitch-yaw-rotator", {
+  schema: {
+    enablePitch: { type: 'boolean', default: true },
+    enableYaw: { type: 'boolean', default: true }
+  },
+
   init() {
     this.pendingXRotation = 0;
     this.el.sceneEl.addEventListener("rotateX", e => {
@@ -63,15 +68,23 @@ AFRAME.registerComponent("pitch-yaw-rotator", {
       const isGhost = lobby && uiRoot && uiRoot.firstChild && uiRoot.firstChild.classList.contains("isGhost");
       const cameraDelta = userinput.get(lobby ? paths.actions.lobbyCameraDelta : paths.actions.cameraDelta);
       if (cameraDelta) {
+        const pitch = this.data.enablePitch ? this.pendingXRotation + cameraDelta[1] : 0;
+        const yaw = this.data.enableYaw ? cameraDelta[0] : 0;
         rotatePitchAndYaw(
           lobby && !isGhost ? scenePreviewNode.object3D : this.el.object3D,
-          this.pendingXRotation + cameraDelta[1],
-          cameraDelta[0]
+          pitch,
+          yaw
         );
       } else if (this.pendingXRotation) {
-        rotatePitchAndYaw(lobby && !isGhost ? scenePreviewNode.object3D : this.el.object3D, this.pendingXRotation, 0);
+        const pitch = this.data.enablePitch ? this.pendingXRotation : 0;
+        rotatePitchAndYaw(lobby && !isGhost ? scenePreviewNode.object3D : this.el.object3D, pitch, 0);
       }
     }
     this.pendingXRotation = 0;
+  },
+
+  setRotationAxes(enablePitch, enableYaw) {
+    this.data.enablePitch = enablePitch;
+    this.data.enableYaw = enableYaw;
   }
 });

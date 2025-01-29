@@ -311,6 +311,9 @@ AFRAME.GLTFModelPlus.registerComponent("video", "video", mediaInflator, (name, p
 });
 AFRAME.GLTFModelPlus.registerComponent("link", "link", mediaInflator);
 AFRAME.GLTFModelPlus.registerComponent("inline-frame", "inline-frame", async (el, componentName, componentData, components) => {
+  // 전체 데이터를 자세히 로깅
+  console.log("[gltf-mappings] Full componentData:", JSON.stringify(componentData, null, 2));
+
   el.setAttribute("networked", {
     template: "#inline-static-controlled-media",
     owner: "scene",
@@ -329,10 +332,23 @@ AFRAME.GLTFModelPlus.registerComponent("inline-frame", "inline-frame", async (el
 
   el.setAttribute("hover-menu__link", { template: "#inline-hover-menu", isFlat: true });
   el.childNodes.forEach((child) => {
-      if (child.id === 'inline-wrapper') {
-        child.childNodes[1].setAttribute("id", componentData.name);
-        child.childNodes[1].setAttribute("inline-frame-button", `name: ${componentData.name}; src: ${componentData.src}; frameOption: ${componentData.frameOption};`);
-      }
+    if (child.id === 'inline-wrapper') {
+      // 설정하려는 데이터를 자세히 로깅
+      console.log("[gltf-mappings] Setting inline-frame-button:", JSON.stringify({
+        name: componentData.name,
+        src: componentData.src,
+        frameOption: componentData.frameOption,
+        contentType: componentData.contentType,
+        triggerMode: componentData.triggerMode,
+        triggerDistance: componentData.triggerDistance,
+        buttonText: componentData.buttonText,
+        buttonColor: componentData.buttonColor,
+        buttonTextColor: componentData.buttonTextColor
+      }, null, 2));
+
+      child.childNodes[1].setAttribute("id", componentData.name);
+      child.childNodes[1].setAttribute("inline-frame-button", `name: ${componentData.name}; src: ${componentData.src}; frameOption: ${componentData.frameOption}; contentType: ${componentData.contentType}; triggerMode: ${componentData.triggerMode}; triggerDistance: ${componentData.triggerDistance}; buttonText: ${componentData.buttonText}; buttonColor: ${componentData.buttonColor}; buttonTextColor: ${componentData.buttonTextColor};`);
+    }
   });
 });
 

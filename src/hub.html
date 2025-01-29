@@ -129,12 +129,12 @@
                             position="0 0.4 0"></a-entity>
                     </a-entity>
 
-                    <a-entity class="model" gltf-model-plus="inflate: true">
-                        <template data-name="AvatarRoot">
-                            <a-entity ik-controller hand-pose__left hand-pose__right networked-audio-analyser
-                                fullbody-animation-play>
-                            </a-entity>
-                        </template>
+                <a-entity class="model" gltf-model-plus="inflate: true">
+                    <template data-name="AvatarRoot">
+                        <a-entity ik-controller hand-pose__left hand-pose__right networked-audio-analyser
+                            fullbody-animation-play>
+                        </a-entity>
+                    </template>
 
                         <template data-name="Spine">
                             <a-entity is-remote-hover-target personal-space-invader="radius: 0.2; useMaterial: true;"
@@ -639,8 +639,22 @@
 
             <template id="inline-hover-menu">
                 <a-entity id="inline-wrapper" class="ui interactable-ui hover-container" visible="false">
-                    <a-entity id="inline-frame-button" mixin="rounded-text-action-button ui" is-remote-hover-target
-                        tags="singleActionButton: true; isHoverMenuChild: true;" inline-frame-button="src:''; frameOption:'';" position="0 0 0.001">
+                    <a-entity 
+                        id="inline-frame-button" 
+                        mixin="rounded-text-action-button ui" 
+                        is-remote-hover-target
+                        tags="singleActionButton: true; isHoverMenuChild: true;" 
+                        class="interactable"
+                        hover-menu-button
+                        role="button"
+                        inline-frame-button="
+                            src: ''; 
+                            frameOption: '';
+                            contentType: 'url';
+                            triggerMode: 'click';
+                            triggerDistance: 2;
+                            buttonText: 'Open Frame';" 
+                        position="0 0 0.001">
                         <a-entity text="value:open frame; textAlign:center;" text-raycast-hack
                             position="0 0 0.02"></a-entity>
                     </a-entity>
