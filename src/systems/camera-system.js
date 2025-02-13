@@ -286,6 +286,31 @@ export class CameraSystem {
       this.avatarRig = document.getElementById("avatar-rig");
       this.viewingRig = document.getElementById("viewing-rig");
 
+      // Adjust avatar head size when entering VR mode
+      APP.scene.addEventListener("enter-vr", () => {
+        const checkAvatarHead = () => {
+          // Only adjust head size for full-body avatars
+          if (window.APP?.hubChannel?.presence?.metas?.[0]?.profile?.avatarType === 'full-body') {
+            if (window.myAvatarHead) {
+              window.myAvatarHead.scale.set(0, 0, 0);
+            } else {
+              // Retry until avatar head is loaded (max 3 seconds)
+              if (!this.avatarHeadRetryCount) {
+                this.avatarHeadRetryCount = 0;
+              }
+              if (this.avatarHeadRetryCount < 30) { // 100ms * 30 = 3s
+                this.avatarHeadRetryCount++;
+                setTimeout(checkAvatarHead, 100);
+              } else {
+                console.warn("Could not find full-body avatar head");
+              }
+            }
+          }
+        };
+        this.avatarHeadRetryCount = 0;
+        checkAvatarHead();
+      });
+
       const bg = new THREE.Mesh(
         new THREE.BoxGeometry(100, 100, 100),
         new THREE.MeshBasicMaterial({ color: 0x020202, side: THREE.BackSide })

@@ -357,8 +357,8 @@ class UIRoot extends Component {
   componentDidMount() {
     /**
      * belivvr custom
-     * apply_mute, share_screen 이벤트 추가
-     * 다른 곳에서 해당 이벤트를 트리거하면 함수가 실행됨
+     * Added apply_mute, share_screen events
+     * Functions are executed when these events are triggered elsewhere
      */
     window.addEventListener("apply_mute", this.onApplyMute);
     window.addEventListener("share_screen", this.onShareScreen);

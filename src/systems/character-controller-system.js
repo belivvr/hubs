@@ -16,7 +16,7 @@ import { releaseOccupiedWaypoint } from "../bit-systems/waypoint";
 import { shouldUseNewLoader } from "../utils/bit-utils";
 
 /**
- * 내비게이션용존 이름
+ * Name for navigation zone
  */
 const NAV_ZONE = "character";
 const qsAllowWaypointLerp = qsTruthy("waypointLerp");
@@ -52,8 +52,8 @@ export class CharacterControllerSystem {
   constructor(scene) {
     this.scene = scene;
 
-    this.fly = false;                    // 플라이 모드 여부    
-    this.waypoints = [];                 // 웨이포인트 이동 대기열
+    this.fly = false;                    // Fly mode status
+    this.waypoints = [];                 // Waypoint travel queue
     this.waypointTravelStartTime = 0;
     this.waypointTravelTime = 0;
 
@@ -63,18 +63,18 @@ export class CharacterControllerSystem {
     // 이동 관련
     this.relativeMotion = new THREE.Vector3(0, 0, 0);
     this.nextRelativeMotion = new THREE.Vector3(0, 0, 0);
-    this.dXZ = 0; // snap 회전 각도 누적
+    this.dXZ = 0; // Accumulated snap rotation angle
 
     // =============== [추가] 점프 관련 ===============
     /**
-     * 점프 상태 (true = 점프 중)
+     * Jump state (true = jumping)
      * @type {boolean}
      */
     this.isJumping = false;
     this.isJumpDown  = false;
     this.initialAvatarHeightforJump=0;
     /**
-     * 점프 속도 벡터
+     * Jump velocity vector
      * @type {THREE.Vector3}
      */
     this.jumpVelocity = new THREE.Vector3(0, 0, 0);
@@ -86,7 +86,7 @@ export class CharacterControllerSystem {
     // ===============================================
 
     /**
-     * nav-mesh가 로드되면 그룹/노드 초기화
+     * Initialize group/node when nav-mesh is loaded
      */
     this.scene.addEventListener("nav-mesh-loaded", () => {
       this.navGroup = null;
@@ -94,13 +94,14 @@ export class CharacterControllerSystem {
     });
 
     waitForDOMContentLoaded().then(() => {
-      this.avatarPOV = document.getElementById("avatar-pov-node"); // 카메라 POV
-      this.avatarRig = document.getElementById("avatar-rig");     // 아바타 Rig
+      this.avatarPOV = document.getElementById("avatar-pov-node"); // Camera POV
+      this.avatarRig = document.getElementById("avatar-rig");     // Avatar Rig
     });
+    
   }
 
   /**
-   * 웨이포인트 이동을 큐에 등록
+   * Register waypoint travel in queue
    */
   enqueueWaypointTravelTo(inTransform, isInstant, waypointComponentData) {
     this.waypoints.push({
@@ -111,21 +112,21 @@ export class CharacterControllerSystem {
   }
 
   /**
-   * 상대 이동 모션 (키보드 WASD 등)을 누적
+   * Accumulate relative motion (e.g., keyboard WASD)
    */
   enqueueRelativeMotion(motion) {
     this.relativeMotion.add(motion);
   }
 
   /**
-   * 월드 업축 기준, 스냅 회전
+   * Snap rotation around world up axis
    */
   enqueueInPlaceRotationAroundWorldUp(dXZ) {
     this.dXZ += dXZ;
   }
 
   /**
-   * 아바타 Rig를 월드상 targetWorldPosition으로 텔레포트
+   * Teleport avatar rig to targetWorldPosition
    */
   teleportTo = (function () {
     const rig = new THREE.Vector3();
@@ -152,7 +153,7 @@ export class CharacterControllerSystem {
   })();
 
   /**
-   * 웨이포인트 이동 (행렬 inMat4대로) 처리
+   * Process waypoint travel (according to matrix inMat4)
    */
   travelByWaypoint = (function () {
     const inMat4Copy = new THREE.Matrix4();
@@ -165,11 +166,7 @@ export class CharacterControllerSystem {
     const finalPOV = new THREE.Matrix4();
     return function travelByWaypoint(inMat4, snapToNavMesh, willMaintainInitialOrientation) {
       this.avatarPOV.object3D.updateMatrices();
-
-      // 스냅ToNavMesh가 false인데 fly=false면, fly를 강제로 켜기
-      if (!this.fly && !snapToNavMesh) {
-        this.fly = true;
-      }
+ 
       this.shouldUnoccupyWaypointsOnceMoving = true;
       this.didTeleportSinceLastWaypointTravel = false;
 
@@ -183,10 +180,10 @@ export class CharacterControllerSystem {
         inPosition.setFromMatrixPosition(inMat4Copy);
         this.findPositionOnNavMesh(inPosition, inPosition, outPosition, true);
         finalPOV.setPosition(outPosition);
-        // 목표 위치 POV에서 약간 시야 조절 (하단 -0.15)
+        // Adjust view slightly from target position POV (downward -0.15)
         translation.makeTranslation(0, getCurrentPlayerHeight(), -0.15);
       } else {
-        // navmesh 스냅 안할 경우, 카메라 높이를 1.6으로
+        // If not snapping to navmesh, set camera height to 1.6
         translation.makeTranslation(0, 1.6, -0.15);
       }
       finalPOV.multiply(translation);
@@ -203,7 +200,7 @@ export class CharacterControllerSystem {
   })();
 
   /**
-   * 메인 tick
+   * Main tick
    */
   tick = (function () {
     const snapRotatedPOV = new THREE.Matrix4();
@@ -227,17 +224,21 @@ export class CharacterControllerSystem {
 
       uiRoot = uiRoot || document.getElementById("ui-root");
       const isGhost = !entered && uiRoot && uiRoot.firstChild && uiRoot.firstChild.classList.contains("isGhost");
-      if (!isGhost && !entered) return; // 진입 전이면 skip
+      if (!isGhost && !entered) return; // Skip if not entered
 
       const vrMode = this.scene.is("vr-mode");
       this.sfx = this.sfx || this.scene.systems["hubs-systems"].soundEffectsSystem;
       this.waypointSystem = this.waypointSystem || this.scene.systems["hubs-systems"].waypointSystem;
 
-      // 1) 웨이포인트 처리
+      if (this._lastFlyState !== this.fly) {        
+        this._lastFlyState = this.fly;
+      }      
+
+      // 1) Process waypoints
       if (!this.activeWaypoint && this.waypoints.length) {
         this.activeWaypoint = this.waypoints.splice(0, 1)[0];
 
-        // 모바일이 아닐 때, 모션을 막거나 텔레포트 막아둘지 여부
+        // Determine whether to disable motion or teleporting when not on mobile
         this.isMotionDisabled =
           this.activeWaypoint.waypointComponentData.willDisableMotion &&
           (!isMobile || this.activeWaypoint.waypointComponentData.willDisableTeleporting);
@@ -291,15 +292,14 @@ export class CharacterControllerSystem {
         }
       }
 
-      // 2) 플라이/점프/이동 처리
+      // 2) Process fly/jump/movement
       const userinput = AFRAME.scenes[0].systems.userinput;
       const wasFlying = this.fly;
-      if (userinput.get(paths.actions.toggleFly)) {        
-        this.avatarRig.messageDispatch.dispatch("/fly"); // fly 토글
+      if (userinput.get(paths.actions.toggleFly)) {      
+        this.avatarRig.messageDispatch.dispatch("/fly");
       }
       const didStopFlying = wasFlying && !this.fly;
-      if (this.fly) {
-        // 플라이면 내비 노드 무시
+      if (this.fly) {        
         this.navNode = null;
       }
       const preferences = window.APP.store.state.preferences;
@@ -316,41 +316,34 @@ export class CharacterControllerSystem {
         this.scene.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_SNAP_ROTATE);
       }
 
-      // 2-1) 점프 로직
+      // 2-1) Jump logic
       if (userinput.get(paths.actions.jump) && !this.isJumping) {
-        // 점프 시작
+        // Start jump
         this.isJumping = true;
         this.isJumpDown = false;
         
-      // 아바타의 초기 키 저장
-        this.initialAvatarHeightforJump = this.avatarPOV.object3D.position.y;
-        console.log("[JUMP] initialAvatarHeightforJump: ", this.initialAvatarHeightforJump);
+        // Save initial height of avatar
+        this.initialAvatarHeightforJump = this.avatarPOV.object3D.position.y;        
         
-        this.jumpVelocity.set(0, 6, 0); // 초속 6m 위로        
-
-        console.log("[JUMP] Start: ", this.jumpVelocity);
+        this.jumpVelocity.set(0, 6, 0); // Initial upward velocity of 6m/s        
+        
       }
       if (this.isJumping) {
-        // 중력
+        // Gravity
         this.jumpVelocity.y -= 9.8 * (dt / 1000);
 
-        // 이번 프레임 이동량 = jumpVelocity * dt
+        // Movement for this frame = jumpVelocity * dt
         const jumpDelta = this.jumpVelocity.clone().multiplyScalar(dt / 1000);
         // avatarRig에 반영, displacementToDesiredPOV에도 반영, 착지는 아래의 코드에서 처리
-        console.log("[JUMP] this.isJumping velocity: ",this.jumpVelocity);     
-        console.log("[JUMP] avatarPOV.object3D.position.y: ",this.avatarPOV.object3D.position.y);     
-        console.log("[JUMP] jumpDelta :", jumpDelta);
 
         this.avatarRig.object3D.position.add(jumpDelta);
         this.avatarPOV.object3D.position.add(jumpDelta);
-        console.log("[JUMP] avatarPOV.object3D.position.y: ",this.avatarPOV.object3D.position.y);     
-        // 하강 기록
+        // Record descent
         if (this.jumpVelocity.y < 0){
             this.isJumpDown = true;
             
-            // 아바타의 초기 키 * 110%가 되는 시점에 점프 중지
+            // Stop jump when avatar's initial height * 102% is reached
             if (this.avatarPOV.object3D.position.y < this.initialAvatarHeightforJump * 1.02){ 
-              console.log("[JUMP] Jump Stop: ",this.jumpVelocity);   
               this.isJumping = false;
               this.isJumpDown = false;
               this.avatarRig.object3D.position.y = this.avatarRig.object3D.position.y - (this.avatarPOV.object3D.position.y - this.initialAvatarHeightforJump);
@@ -361,7 +354,7 @@ export class CharacterControllerSystem {
 
       }
 
-      // 2-2) 이동 입력
+      // 2-2) Movement input
       const characterAcceleration = userinput.get(paths.actions.characterAcceleration);
       const hasCharacterAcceleration = characterAcceleration && (characterAcceleration[0] || characterAcceleration[1]);
       if (characterAcceleration) {
@@ -382,15 +375,15 @@ export class CharacterControllerSystem {
       this.nextRelativeMotion.copy(this.relativeMotion).multiplyScalar(lerpC);
       this.relativeMotion.multiplyScalar(1 - lerpC);
 
-      // 3) POV (avatarPOV)를 스냅 회전(dXZ) 적용
+      // 3) Apply snap rotation (dXZ) to POV (avatarPOV)
       this.avatarPOV.object3D.updateMatrices();
       rotateInPlaceAroundWorldUp(this.avatarPOV.object3D.matrixWorld, this.dXZ, snapRotatedPOV);
       newPOV.copy(snapRotatedPOV);
 
-      // 4) navmesh & 이동 속도
+      // 4) Navmesh & movement speed
       const navMeshExists = NAV_ZONE in this.scene.systems.nav.pathfinder.zones;
       if (!this.isMotionDisabled) {
-        // player scale
+        // Player scale
         const playerScale = v.setFromMatrixColumn(this.avatarPOV.object3D.matrixWorld, 1).length();
         const triedToMove = this.relativeMotion.lengthSq() > 0.000001;
         if (triedToMove) {
@@ -415,8 +408,8 @@ export class CharacterControllerSystem {
         }
 
         const shouldRecomputeNavGroupAndNavNode = didStopFlying;
-        const shouldResnapToNavMesh = navMeshExists && (shouldRecomputeNavGroupAndNavNode || triedToMove);
-
+        const shouldResnapToNavMesh = !this.fly && navMeshExists && (shouldRecomputeNavGroupAndNavNode || triedToMove);
+        
         let squareDistNavMeshCorrection = 0;
 
         if (shouldResnapToNavMesh) {
@@ -429,15 +422,15 @@ export class CharacterControllerSystem {
 
           squareDistNavMeshCorrection = desiredPOVPosition.distanceToSquared(navMeshSnappedPOVPosition);
 
-          if (this.fly && squareDistNavMeshCorrection < 0.5 && !this.activeWaypoint) {                      
-            this.fly = false;            
+          if (this.fly && squareDistNavMeshCorrection < 0.5 && !this.activeWaypoint) {            
+            this.fly = false;
             newPOV.setPosition(navMeshSnappedPOVPosition);
           } else if (!this.fly) {
             newPOV.setPosition(navMeshSnappedPOVPosition);
           }
         }
 
-        // waypoint 점유 해제
+        // Release waypoint occupancy
         if (
           !this.activeWaypoint &&
           this.shouldUnoccupyWaypointsOnceMoving &&
@@ -458,17 +451,16 @@ export class CharacterControllerSystem {
       }
       
 
-      // 최종: avatarRig.object3D ↔ avatarPOV.object3D 동기화
+      // Final: Synchronize avatarRig.object3D ↔ avatarPOV.object3D
       childMatch(this.avatarRig.object3D, this.avatarPOV.object3D, newPOV);
 
-      // 이동 후 relativeMotion 초기화/회전각 초기화
+      // Reset relativeMotion/rotation angle after movement
       this.relativeMotion.copy(this.nextRelativeMotion);
       this.dXZ = 0;
-      
     };
   })();
 
-  // 내비메시 상 getClosestNode
+  // Get closest node on navmesh
   getClosestNode(pos) {
     const pathfinder = this.scene.systems.nav.pathfinder;
     if (!pathfinder.zones[NAV_ZONE].groups[this.navGroup]) {
@@ -480,7 +472,7 @@ export class CharacterControllerSystem {
     );
   }
 
-  // POV 포지션을 navmesh에 스냅
+  // Snap POV position to navmesh
   findPOVPositionAboveNavMesh = (function () {
     const startingFeetPosition = new THREE.Vector3();
     const desiredFeetPosition = new THREE.Vector3();
@@ -506,7 +498,7 @@ export class CharacterControllerSystem {
     };
   })();
 
-  // navmesh 상에서 start->end clamp
+  // Clamp start->end on navmesh
   findPositionOnNavMesh(start, end, outPos, shouldRecomputeGroupAndNode) {
     const pathfinder = this.scene.systems.nav.pathfinder;
     if (!pathfinder.zones[NAV_ZONE]) return;
@@ -526,7 +518,7 @@ export class CharacterControllerSystem {
     return outPos;
   }
 
-  // 플라이 on/off
+  // Enable/disable fly
   enableFly(enabled) {
     if (enabled && window.APP.hubChannel && window.APP.hubChannel.can("fly")) {
       this.fly = true;

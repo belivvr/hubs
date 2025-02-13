@@ -104,10 +104,8 @@ export default class MessageDispatch extends EventTarget {
       case "fly":
         if (this.scene.systems["hubs-systems"].characterController.fly) {
           this.scene.systems["hubs-systems"].characterController.enableFly(false);
-          this.log(LogMessageType.flyModeDisabled);
         } else {
           if (this.scene.systems["hubs-systems"].characterController.enableFly(true)) {
-            this.log(LogMessageType.flyModeEnabled);
           }
         }
         break;
